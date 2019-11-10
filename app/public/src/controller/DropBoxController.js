@@ -6,6 +6,10 @@ class DropBoxController {
         this.btnSendFileEl = document.querySelector("#btn-send-file");
         this.inputFilesEl = document.querySelector("#files");
         this.snackModalEl = document.querySelector('#react-snackbar-root');
+        // Search class
+        this.progressBarEl = this.snackModalEl.querySelector('.mc-progress-bar-fg');
+        this.nameFileEl = this.snackModalEl.querySelector('.filename');
+        this.timeleftEl = this.snackModalEl.querySelector('.timeleft');
 
         this.initEvents();
     }
@@ -25,9 +29,17 @@ class DropBoxController {
             // Allow to send more than one file together
             this.uploadTask(event.target.files);
 
-            // Shows upload progress element by css
-            this.snackModalEl.style.display = 'block';
+            this.modalShow();
+
+            // Init to the next upload
+            this.inputFilesEl.value = '';
         });
+    }
+
+    modalShow(show = true){
+
+        // Shows upload progress element by css
+        this.snackModalEl.style.display = (show) ? 'block' : 'none';
     }
 
     uploadTask(files){
@@ -47,6 +59,9 @@ class DropBoxController {
 
                 // Verify valid JSON
                 ajax.onload = event => {
+
+                    // Hide modal
+                    this.modalShow(false);
                     
                     try{
                         resolve(JSON.parse(ajax.responseText));
@@ -57,7 +72,18 @@ class DropBoxController {
 
                 ajax.onerror = event => {
 
+                    // Hide modal
+                    this.modalShow(false);
+
                     reject(event);
+                };
+
+                // Generated multiple events in upload to calculate the progress bar
+                ajax.upload.onprogress = event => {
+
+                    this.uploadProgress(event, file);
+
+                    //console.log(event);
                 };
 
                 // API
@@ -65,6 +91,9 @@ class DropBoxController {
 
                 // Params: field to send, file
                 formData.append('input-file', file);
+
+                // Get current tick
+                this.startUploadTime = Date.now();
 
                 ajax.send(formData);
             }));
@@ -74,4 +103,49 @@ class DropBoxController {
         // Resolve if all files are OK, if one fails return reject
         return Promise.all(promises);
     }
+
+    uploadProgress(event, file){
+
+        let timespent = Date.now() - this.startUploadTime;
+        let loaded = event.loaded;
+        let total = event.total;
+        let porcent = parseInt((loaded/total) * 100);
+        let timeleft = ((100 - porcent)*timespent) / porcent;
+
+        // Update css by template string
+        this.progressBarEl.style.width = `${porcent}%`;
+
+        this.nameFileEl.innerHTML = file.name;
+
+        this.timeleftEl.innerHTML = this.formatTimeToHuman(timeleft);
+
+        //console.log(timespent, timeleft, porcent);
+    }
+
+    // duration in ms
+    formatTimeToHuman(duration){
+
+        let seconds = parseInt((duration/1000) % 60);
+        let minutes = parseInt((duration/(1000*60)) % 60);
+        let hours = parseInt((duration/(1000*60*60)) % 24);
+
+        // More than one hour
+        if(hours){
+            return `${hours} horas, ${minutes} minutos e ${seconds} segundos`;
+        }
+
+        if(minutes){
+            return `${minutes} minutos e ${seconds} segundos`;
+        }
+
+        if(seconds){
+            return `${seconds} segundos`;
+        }
+
+        // When it's very fast!
+        return '';
+        
+    }
+
+
 }
